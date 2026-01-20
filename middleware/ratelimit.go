@@ -56,7 +56,7 @@ func (m *RateLimitMiddleware) RateLimit(next http.Handler) http.Handler {
 
 		allowed, err := m.limiter.Allow(ctx, key, limit, m.windowSeconds)
 		if err != nil {
-			http.Error(w, `{"error": "internal server error"}`, http.StatusInternalServerError)
+			next.ServeHTTP(w, r)
 			return
 		}
 

@@ -78,6 +78,30 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"service": "API Rate-Limit & Abuse Detection Gateway",
+			"version": "1.0.0",
+			"status": "running",
+			"endpoints": {
+				"health": "/health",
+				"api": "/api/*",
+				"admin": {
+					"blocked_ips": "/admin/blocked-ips",
+					"unblock": "/admin/unblock",
+					"ip_risk": "/admin/ip-risk",
+					"abuse_events": "/admin/abuse-events",
+					"metrics": "/admin/metrics"
+				}
+			}
+		}`))
+	})
+
 	mux.HandleFunc("/health", adminHandler.HealthCheck)
 
 	mux.HandleFunc("/admin/blocked-ips", func(w http.ResponseWriter, r *http.Request) {

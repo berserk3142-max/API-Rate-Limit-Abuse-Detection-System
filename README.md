@@ -1,147 +1,536 @@
-# API Rate-Limit & Abuse Detection System
+# 🛡️ API Rate-Limit & Abuse Detection System
 
-A production-grade API Gateway with rate limiting, abuse detection, and event streaming built in Go.
+A production-grade API Gateway with intelligent rate limiting, automatic abuse detection, IP reputation tracking, and real-time monitoring dashboard built in Go.
 
-## Features
+![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+![Status](https://img.shields.io/badge/Status-Production_Ready-brightgreen?style=flat)
 
-- **Sliding Window Rate Limiting** - Redis-based atomic rate limiting with Lua scripts
-- **Multi-tier Rate Limits** - Different limits for FREE, PRO, and ENTERPRISE plans
-- **IP Fingerprinting** - Track and block suspicious IPs
-- **JWT & API Key Authentication** - Flexible authentication options
-- **Kafka Event Streaming** - Real-time abuse event publishing and consumption
-- **Admin APIs** - Manage blocked IPs, view metrics, and abuse events
-- **Reverse Proxy** - Forward requests to backend services
+---
 
-## Project Structure
+## 📋 Table of Contents
 
+- [Problem Statement](#-problem-statement)
+- [Solution Overview](#-solution-overview)
+- [Architecture](#-architecture)
+- [How It Works](#-how-it-works)
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [API Reference](#-api-reference)
+- [Dashboard](#-dashboard)
+- [Configuration](#-configuration)
+- [Real-World Use Cases](#-real-world-use-cases)
+
+---
+
+## 🎯 Problem Statement
+
+Modern APIs face critical challenges:
+
+| Problem | Impact | Without Protection |
+|---------|--------|-------------------|
+| **DDoS Attacks** | Server crashes | Millions of requests overwhelm servers |
+| **Brute Force** | Security breach | Unlimited login attempts |
+| **Data Scraping** | Data theft | Competitors steal your data |
+| **Resource Abuse** | High costs | Single user consumes all resources |
+| **Bot Traffic** | Poor UX | Real users can't access services |
+
+---
+
+## 💡 Solution Overview
+
+This system acts as a **security gateway** between users and your backend API:
+
+```mermaid
+flowchart LR
+    A[Client] --> B[API Gateway]
+    B --> C{Rate Limiter}
+    C -->|Allowed| D[Backend API]
+    C -->|Blocked| E[429 Error]
+    
+    B --> F[(Redis)]
+    B --> G[Dashboard]
+    
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#fce4ec
+    style D fill:#e8f5e9
+    style E fill:#ffebee
+    style F fill:#f3e5f5
+    style G fill:#e0f2f1
 ```
-├── main.go                 # Application entry point
-├── config/
-│   └── config.go           # Environment configuration
-├── proxy/
-│   └── forward.go          # Reverse proxy implementation
-├── ratelimiter/
-│   └── limiter.go          # Redis sliding window rate limiter
-├── middleware/
-│   ├── auth.go             # JWT/API key authentication
-│   ├── logging.go          # Request logging
-│   ├── ratelimit.go        # Rate limiting middleware
-│   └── fingerprint.go      # IP fingerprinting
-├── database/
-│   ├── connection.go       # PostgreSQL connection
-│   └── schema.sql          # Database schema
-├── models/
-│   └── models.go           # Data models
-├── repository/
-│   ├── user.go             # User repository
-│   ├── apikey.go           # API key repository
-│   └── ip_reputation.go    # IP reputation repository
-├── kafka/
-│   ├── events.go           # Event definitions
-│   ├── producer.go         # Kafka producer
-│   └── consumer.go         # Kafka consumer
-└── handlers/
-    └── admin.go            # Admin API handlers
+
+---
+
+## 🏗️ Architecture
+
+### High-Level System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client Layer
+        A[Web Browser]
+        B[Mobile App]
+        C[API Client]
+    end
+    
+    subgraph API Gateway
+        D[Logging Middleware]
+        E[Auth Middleware]
+        F[Fingerprint Middleware]
+        G[Rate Limit Middleware]
+        H[Reverse Proxy]
+    end
+    
+    subgraph Data Stores
+        I[(Redis<br/>Rate Counters)]
+        J[(PostgreSQL<br/>User Data)]
+        K[Kafka<br/>Events]
+    end
+    
+    subgraph Backend
+        L[Your API<br/>Service]
+    end
+    
+    A --> D
+    B --> D
+    C --> D
+    D --> E --> F --> G --> H
+    G <--> I
+    E <--> J
+    F --> K
+    H --> L
+    
+    style D fill:#bbdefb
+    style E fill:#c8e6c9
+    style F fill:#fff9c4
+    style G fill:#ffccbc
+    style H fill:#e1bee7
 ```
 
-## Prerequisites
+### Request Processing Flow
+
+```mermaid
+flowchart TD
+    A[Incoming Request] --> B[Generate Request ID]
+    B --> C[Log Request Details]
+    C --> D{Authenticated?}
+    
+    D -->|Yes| E[Extract User Plan]
+    D -->|No| F[Use IP-based Limit]
+    
+    E --> G{Check Rate Limit}
+    F --> G
+    
+    G -->|Under Limit| H[Update IP Reputation<br/>Score: +0]
+    G -->|Over Limit| I[Update IP Reputation<br/>Score: -5]
+    
+    H --> J[Forward to Backend]
+    I --> K[Return 429 Error]
+    
+    J --> L[Log Response]
+    K --> L
+    
+    L --> M[Send Response to Client]
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style G fill:#fff3e0
+    style H fill:#e8f5e9
+    style I fill:#ffebee
+    style J fill:#c8e6c9
+    style K fill:#ffcdd2
+```
+
+### Middleware Chain
+
+```mermaid
+flowchart LR
+    subgraph Middleware Chain
+        direction LR
+        A[Logging] --> B[CORS]
+        B --> C[Auth]
+        C --> D[Fingerprint]
+        D --> E[Rate Limit]
+    end
+    
+    E --> F{Allowed?}
+    F -->|Yes| G[Backend]
+    F -->|No| H[429 Response]
+    
+    style A fill:#e1f5fe
+    style B fill:#f1f8e9
+    style C fill:#fff8e1
+    style D fill:#fce4ec
+    style E fill:#e8eaf6
+    style G fill:#c8e6c9
+    style H fill:#ffcdd2
+```
+
+---
+
+## ⚙️ How It Works
+
+### 1. Rate Limiting (Sliding Window Algorithm)
+
+```mermaid
+flowchart LR
+    subgraph Window["60 Second Window"]
+        R1[R1] --> R2[R2]
+        R2 --> R3[R3]
+        R3 --> R4[...]
+        R4 --> R99[R99]
+        R99 --> R100[R100]
+    end
+    
+    R100 --> CHECK{Request 101?}
+    CHECK -->|Over Limit| BLOCK[❌ BLOCKED<br/>429 Error]
+    
+    subgraph After30["After 30 seconds"]
+        OLD[Old requests<br/>slide out] --> NEW[New slot<br/>available]
+    end
+    
+    style BLOCK fill:#ffcdd2
+    style NEW fill:#c8e6c9
+```
+
+### 2. IP Reputation System
+
+```mermaid
+flowchart TD
+    A[New IP Detected] --> B[Score: 100<br/>Perfect]
+    
+    B --> C{Request Outcome}
+    
+    C -->|Success 200| D[Score Unchanged]
+    C -->|Blocked 429| E[Score -= 5]
+    
+    D --> F{Check Thresholds}
+    E --> F
+    
+    F -->|Score < 30| G[🚨 SUSPICIOUS]
+    F -->|Blocks >= 5| G
+    F -->|Blocks >= 20| H[🚫 AUTO-BLOCKED]
+    F -->|Normal| I[✅ OK]
+    
+    style A fill:#e3f2fd
+    style B fill:#c8e6c9
+    style G fill:#fff3e0
+    style H fill:#ffcdd2
+    style I fill:#e8f5e9
+```
+
+### 3. Multi-Tier Rate Limits
+
+```mermaid
+flowchart LR
+    subgraph Plans
+        FREE[FREE<br/>100/min]
+        PRO[PRO<br/>1000/min]
+        ENT[ENTERPRISE<br/>10000/min]
+    end
+    
+    USER[User Request] --> AUTH{Auth Check}
+    AUTH -->|No Token| FREE
+    AUTH -->|Pro Token| PRO
+    AUTH -->|Enterprise| ENT
+    
+    style FREE fill:#e3f2fd
+    style PRO fill:#fff3e0
+    style ENT fill:#e8f5e9
+```
+
+### 4. Abuse Detection Flow
+
+```mermaid
+flowchart TD
+    A[Request Received] --> B[Track IP]
+    B --> C[Update Counters]
+    
+    C --> D{Blocked Request?}
+    D -->|Yes| E[Increment Block Count]
+    D -->|No| F[Increment Success Count]
+    
+    E --> G{Block Count >= 5?}
+    G -->|Yes| H[Mark SUSPICIOUS]
+    G -->|No| I[Continue Monitoring]
+    
+    H --> J{Block Count >= 20?}
+    J -->|Yes| K[AUTO-BLOCK IP]
+    J -->|No| L[Alert Admin]
+    
+    K --> M[Add to Blocked List]
+    M --> N[Reject All Future Requests]
+    
+    style H fill:#fff3e0
+    style K fill:#ffcdd2
+    style N fill:#ffebee
+```
+
+---
+
+## ✨ Features
+
+### Core Features
+
+| Feature | Description |
+|---------|-------------|
+| 🚦 **Sliding Window Rate Limiting** | Redis-based atomic counters using Lua scripts |
+| 🔍 **IP Reputation Tracking** | Automatic scoring and suspicious IP detection |
+| 🚫 **Auto-Block** | IPs with 20+ blocks are automatically banned |
+| 🎫 **JWT & API Key Auth** | Flexible authentication options |
+| 📊 **Real-time Dashboard** | Beautiful UI for monitoring |
+| 📝 **Request Logging** | Every request gets a unique ID |
+| 🌐 **Reverse Proxy** | Forward requests to backend services |
+
+### Complete Feature Flow
+
+```mermaid
+flowchart TB
+    subgraph Features
+        A[Rate Limiting] --> B[IP Tracking]
+        B --> C[Auto Detection]
+        C --> D[Dashboard]
+        D --> E[Alerting]
+    end
+    
+    subgraph Actions
+        F[Block IP]
+        G[Unblock IP]
+        H[View Logs]
+        I[Check Score]
+    end
+    
+    D --> F
+    D --> G
+    D --> H
+    D --> I
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - Go 1.21+
-- Redis
-- PostgreSQL
-- Kafka (optional)
+- Redis (for rate limiting)
+- PostgreSQL (optional, for persistence)
 
-## Quick Start
-
-### 1. Clone the repository
+### 1. Clone & Install
 
 ```bash
 git clone https://github.com/berserk3142-max/API-Rate-Limit-Abuse-Detection-System.git
 cd API-Rate-Limit-Abuse-Detection-System
-```
-
-### 2. Install dependencies
-
-```bash
 go mod tidy
 ```
 
-### 3. Start infrastructure (Docker)
+### 2. Start Redis (Docker)
 
 ```bash
 docker run -d --name redis -p 6379:6379 redis
-docker run -d --name postgres -p 5432:5432 -e POSTGRES_PASSWORD=password postgres
 ```
 
-### 4. Set environment variables
-
-```bash
-export SERVER_PORT=8080
-export REDIS_ADDR=localhost:6379
-export POSTGRES_DSN="postgres://postgres:password@localhost:5432/ratelimiter?sslmode=disable"
-export JWT_SECRET=your-secret-key
-export BACKEND_URL=http://localhost:9000
-```
-
-### 5. Run the application
+### 3. Run the Server
 
 ```bash
 go run main.go
 ```
 
-## API Endpoints
+### 4. Open Dashboard
+
+```
+http://localhost:8080/dashboard
+```
+
+---
+
+## 📡 API Reference
+
+### Endpoint Overview
+
+```mermaid
+flowchart LR
+    subgraph Public
+        A["/health"]
+        B["/api/*"]
+    end
+    
+    subgraph Admin
+        C["/admin/metrics"]
+        D["/admin/blocked-ips"]
+        E["/admin/suspicious-ips"]
+        F["/admin/ip-risk"]
+        G["/admin/all-ips"]
+        H["/admin/recent-requests"]
+    end
+    
+    subgraph Dashboard
+        I["/dashboard"]
+    end
+```
 
 ### Health Check
-```
+
+```http
 GET /health
 ```
 
-### Admin APIs
-```
-GET  /admin/blocked-ips     # List blocked IPs
-POST /admin/blocked-ips     # Block an IP
-POST /admin/unblock         # Unblock an IP
-GET  /admin/ip-risk?ip=X    # Get IP risk score
-GET  /admin/abuse-events?ip=X  # Get abuse events for IP
-GET  /admin/metrics         # Get traffic metrics
-```
-
-### Proxy
-```
-ANY /api/*                  # Proxied to backend service
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "api-gateway",
+  "total_requests": 150,
+  "blocked_requests": 5
+}
 ```
 
-## Rate Limit Headers
+### Admin Endpoints
 
-All responses include:
-- `X-RateLimit-Limit` - Maximum requests allowed
-- `X-RateLimit-Remaining` - Requests remaining in window
-- `X-RateLimit-Reset` - Unix timestamp when limit resets
+#### Get All Tracked IPs
 
-## Environment Variables
+```http
+GET /admin/all-ips
+```
+
+#### Get IP Risk Score
+
+```http
+GET /admin/ip-risk?ip=192.168.1.1
+```
+
+**Response:**
+```json
+{
+  "ip": "192.168.1.1",
+  "reputation_score": 85,
+  "is_blocked": false,
+  "is_suspicious": false,
+  "total_requests": 100,
+  "blocked_requests": 3,
+  "user_agents": ["Mozilla/5.0...", "curl/8.0"],
+  "first_seen": "2026-01-22T00:00:00Z",
+  "last_seen": "2026-01-22T01:30:00Z"
+}
+```
+
+#### Get Suspicious IPs
+
+```http
+GET /admin/suspicious-ips
+```
+
+#### Block an IP
+
+```http
+POST /admin/blocked-ips
+Content-Type: application/json
+
+{
+  "ip": "192.168.1.100",
+  "reason": "Suspicious bot activity"
+}
+```
+
+#### Unblock an IP
+
+```http
+POST /admin/unblock
+Content-Type: application/json
+
+{
+  "ip": "192.168.1.100"
+}
+```
+
+#### Get Recent Requests
+
+```http
+GET /admin/recent-requests
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| SERVER_PORT | 8080 | Server listen port |
-| REDIS_ADDR | localhost:6379 | Redis address |
-| REDIS_PASSWORD | "" | Redis password |
-| REDIS_DB | 0 | Redis database number |
-| POSTGRES_DSN | postgres://... | PostgreSQL connection string |
-| KAFKA_BROKERS | localhost:9092 | Kafka broker addresses |
-| KAFKA_TOPIC | abuse-events | Kafka topic for events |
-| JWT_SECRET | your-secret-key | JWT signing secret |
-| BACKEND_URL | http://localhost:9000 | Backend service URL |
-| RATE_LIMIT_WINDOW | 60 | Rate limit window in seconds |
-| RATE_LIMIT_MAX | 100 | Default max requests per window |
+| `SERVER_PORT` | 8080 | Server listen port |
+| `REDIS_ADDR` | localhost:6379 | Redis address |
+| `REDIS_PASSWORD` | "" | Redis password |
+| `POSTGRES_DSN` | - | PostgreSQL connection string |
+| `JWT_SECRET` | your-secret-key | JWT signing secret |
+| `BACKEND_URL` | http://localhost:9000 | Backend service URL |
+| `RATE_LIMIT_WINDOW` | 60 | Window in seconds |
+| `RATE_LIMIT_MAX` | 100 | Max requests per window |
 
-## Rate Limit Plans
+---
 
-| Plan | Requests/min |
-|------|-------------|
-| FREE | 100 |
-| PRO | 1000 |
-| ENTERPRISE | 10000 |
+## 🌍 Real-World Use Cases
 
-## License
+### Use Case Flow
 
-MIT
+```mermaid
+flowchart TB
+    subgraph E-Commerce
+        A1[Product API] --> A2[Rate Limit]
+        A2 --> A3[Block Scrapers]
+    end
+    
+    subgraph Banking
+        B1[Login API] --> B2[Track Attempts]
+        B2 --> B3[Block Brute Force]
+    end
+    
+    subgraph SaaS
+        C1[API Access] --> C2[Check Plan]
+        C2 --> C3[Enforce Limits]
+    end
+    
+    subgraph Gaming
+        D1[Game API] --> D2[Per-User Limit]
+        D2 --> D3[Block Cheaters]
+    end
+```
+
+---
+
+## 🔧 Response Headers
+
+Every response includes rate limit headers:
+
+```http
+X-RateLimit-Limit: 100        # Max requests allowed
+X-RateLimit-Remaining: 95     # Requests remaining
+X-RateLimit-Reset: 1642857600 # Unix timestamp for reset
+```
+
+When rate limited (429 response):
+```http
+Retry-After: 60               # Seconds until retry
+```
+
+---
+
+## 📝 License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+<p align="center">
+  Built with ❤️ using Go, Redis, and modern web technologies
+</p>

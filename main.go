@@ -136,6 +136,8 @@ func main() {
 	mux.HandleFunc("/admin/abuse-events", adminHandler.GetAbuseEvents)
 	mux.HandleFunc("/admin/metrics", adminHandler.GetTrafficMetrics)
 	mux.HandleFunc("/admin/all-ips", adminHandler.GetAllIPs)
+	mux.HandleFunc("/admin/recent-requests", adminHandler.GetRecentRequests)
+	mux.HandleFunc("/admin/system-status", adminHandler.GetSystemStatus)
 
 	if reverseProxy != nil {
 		mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

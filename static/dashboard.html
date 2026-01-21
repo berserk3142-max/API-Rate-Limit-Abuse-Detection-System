@@ -548,6 +548,103 @@
                 </div>
             </div>
         </div>
+
+        <!-- Live Activity Feed -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <h2 class="card-title">📡 Live Activity Feed</h2>
+                <div style="display: flex; gap: 10px;">
+                    <span id="liveIndicator"
+                        style="display: flex; align-items: center; gap: 5px; color: var(--accent-success);">
+                        <span
+                            style="width: 8px; height: 8px; background: var(--accent-success); border-radius: 50%; animation: pulse 2s infinite;"></span>
+                        Live
+                    </span>
+                    <button class="action-btn primary" onclick="fetchRecentRequests()" style="padding: 8px 16px;">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+            <div id="activityFeed" style="max-height: 300px; overflow-y: auto;">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Test Console -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <h2 class="card-title">🧪 API Test Console</h2>
+                <span style="color: var(--text-secondary); font-size: 0.85rem;">Test rate limiting in action</span>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                Click the buttons below to make test API requests and watch the rate limiter in action!
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <button class="action-btn primary" onclick="testAPI('/health')">
+                    💓 Test Health Endpoint
+                </button>
+                <button class="action-btn primary" onclick="testAPI('/api/test')">
+                    📡 Test API Endpoint
+                </button>
+                <button class="action-btn danger" onclick="stressTest()" id="stressTestBtn">
+                    ⚡ Stress Test (10 requests)
+                </button>
+            </div>
+            <div id="testResult"
+                style="margin-top: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 10px; display: none;">
+                <pre style="margin: 0; color: var(--accent-primary); font-size: 0.85rem; white-space: pre-wrap;"></pre>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🖥️ System Status</h2>
+            </div>
+            <div id="systemStatus"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div class="stat-card" style="padding: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5rem;">🗄️</span>
+                        <div>
+                            <div style="font-weight: 600;">Database</div>
+                            <div id="dbStatus" style="color: var(--accent-success); font-size: 0.85rem;">Connected</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5rem;">⚡</span>
+                        <div>
+                            <div style="font-weight: 600;">Redis</div>
+                            <div id="redisStatus" style="color: var(--accent-warning); font-size: 0.85rem;">Not
+                                Connected</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5rem;">📨</span>
+                        <div>
+                            <div style="font-weight: 600;">Kafka</div>
+                            <div id="kafkaStatus" style="color: var(--accent-warning); font-size: 0.85rem;">Not
+                                Connected</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5rem;">📊</span>
+                        <div>
+                            <div style="font-weight: 600;">Session Requests</div>
+                            <div id="sessionRequests" style="color: var(--accent-primary); font-size: 0.85rem;">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -556,14 +653,148 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             refreshData();
-            setInterval(refreshData, 30000); // Refresh every 30s
+            setInterval(refreshData, 5000); // Refresh every 5s for live effect
         });
 
         async function refreshData() {
             await Promise.all([
                 fetchHealth(),
-                fetchAllIPs()
+                fetchAllIPs(),
+                fetchRecentRequests(),
+                fetchSystemStatus()
             ]);
+        }
+
+        // Fetch and display recent requests
+        async function fetchRecentRequests() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/recent-requests`);
+                const data = await res.json();
+
+                const requests = data.requests || [];
+                renderActivityFeed(requests);
+            } catch (err) {
+                console.error('Failed to fetch recent requests:', err);
+            }
+        }
+
+        // Render activity feed
+        function renderActivityFeed(requests) {
+            const container = document.getElementById('activityFeed');
+
+            if (!requests || requests.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <div class="empty-state-icon">📡</div>
+                        <p>No requests yet. Use the API Test Console below!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = requests.map(req => {
+                const statusColor = req.status_code === 200 ? 'var(--accent-success)'
+                    : req.status_code === 429 ? 'var(--accent-danger)'
+                        : 'var(--accent-warning)';
+                const statusIcon = req.status_code === 200 ? '✅'
+                    : req.status_code === 429 ? '🚫'
+                        : '⚠️';
+                const time = new Date(req.timestamp).toLocaleTimeString();
+
+                return `
+                    <div class="ip-item" style="margin-bottom: 8px;">
+                        <div class="ip-info" style="flex: 1;">
+                            <span style="font-size: 1.2rem;">${statusIcon}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <span style="font-weight: 600; color: var(--accent-primary);">${req.method}</span>
+                                    <span style="font-family: monospace; font-size: 0.9rem;">${req.path}</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px;">
+                                    ${req.ip} • ${time} • ${req.duration}
+                                </div>
+                            </div>
+                        </div>
+                        <span class="ip-score" style="background: ${statusColor}20; color: ${statusColor};">
+                            ${req.status_code}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Test API endpoint
+        async function testAPI(endpoint) {
+            const resultDiv = document.getElementById('testResult');
+            const resultPre = resultDiv.querySelector('pre');
+            resultDiv.style.display = 'block';
+            resultPre.textContent = `Calling ${endpoint}...`;
+
+            try {
+                const start = Date.now();
+                const res = await fetch(`${API_BASE}${endpoint}`);
+                const duration = Date.now() - start;
+                const data = await res.json();
+
+                resultPre.textContent = `Status: ${res.status} (${duration}ms)\n\n${JSON.stringify(data, null, 2)}`;
+
+                // Refresh to show the new request
+                setTimeout(() => fetchRecentRequests(), 500);
+            } catch (err) {
+                resultPre.textContent = `Error: ${err.message}`;
+            }
+        }
+
+        // Stress test - make multiple requests quickly
+        async function stressTest() {
+            const btn = document.getElementById('stressTestBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Running...';
+
+            const resultDiv = document.getElementById('testResult');
+            const resultPre = resultDiv.querySelector('pre');
+            resultDiv.style.display = 'block';
+
+            const results = [];
+            for (let i = 1; i <= 10; i++) {
+                try {
+                    const start = Date.now();
+                    const res = await fetch(`${API_BASE}/api/stress-test-${i}`);
+                    const duration = Date.now() - start;
+                    results.push(`Request ${i}: ${res.status} (${duration}ms)`);
+                } catch (err) {
+                    results.push(`Request ${i}: Error`);
+                }
+                resultPre.textContent = results.join('\n');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '⚡ Stress Test (10 requests)';
+
+            // Refresh data to show all requests
+            setTimeout(() => refreshData(), 500);
+        }
+
+        // Fetch system status
+        async function fetchSystemStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/system-status`);
+                const data = await res.json();
+
+                const dbStatus = document.getElementById('dbStatus');
+                if (data.services?.database === 'connected') {
+                    dbStatus.textContent = 'Connected';
+                    dbStatus.style.color = 'var(--accent-success)';
+                } else {
+                    dbStatus.textContent = 'Disconnected';
+                    dbStatus.style.color = 'var(--accent-danger)';
+                }
+
+                document.getElementById('sessionRequests').textContent =
+                    `${data.stats?.session_requests || 0} total / ${data.stats?.session_blocked || 0} blocked`;
+            } catch (err) {
+                console.error('Failed to fetch system status:', err);
+            }
         }
 
         async function fetchHealth() {

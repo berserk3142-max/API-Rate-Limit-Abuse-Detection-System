@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/berserk3142-max/API-Rate-Limit-Abuse-Detection-System/middleware"
 	"github.com/berserk3142-max/API-Rate-Limit-Abuse-Detection-System/repository"
 )
 
@@ -203,5 +204,50 @@ func (h *AdminHandler) GetAllIPs(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"ips":   ips,
 		"count": len(ips),
+	})
+}
+
+func (h *AdminHandler) GetRecentRequests(w http.ResponseWriter, r *http.Request) {
+	logs := middleware.GetRecentRequests(50)
+	stats := middleware.GetRequestStats()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"requests":         logs,
+		"count":            len(logs),
+		"total_requests":   stats["total"],
+		"blocked_requests": stats["blocked"],
+	})
+}
+
+func (h *AdminHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Check database connection
+	dbStatus := "connected"
+	var totalIPs, blockedIPs int
+	if h.ipRepo == nil {
+		dbStatus = "disconnected"
+	} else {
+		totalIPs, blockedIPs, _ = h.ipRepo.GetStats(ctx)
+	}
+
+	// Get request stats
+	stats := middleware.GetRequestStats()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "running",
+		"services": map[string]interface{}{
+			"database": dbStatus,
+			"redis":    "check_required",
+			"kafka":    "check_required",
+		},
+		"stats": map[string]interface{}{
+			"total_ips":        totalIPs,
+			"blocked_ips":      blockedIPs,
+			"session_requests": stats["total"],
+			"session_blocked":  stats["blocked"],
+		},
 	})
 }

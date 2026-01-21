@@ -3,7 +3,10 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/berserk3142-max/API-Rate-Limit-Abuse-Detection-System/handlers"
 )
 
 type responseWriter struct {
@@ -43,12 +46,27 @@ func (m *LoggingMiddleware) Log(next http.Handler) http.Handler {
 		next.ServeHTTP(rw, r)
 
 		duration := time.Since(start)
+		latencyMs := duration.Milliseconds()
+
+		// Get client IP
+		ip := r.RemoteAddr
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.Split(xff, ",")
+			ip = strings.TrimSpace(ips[0])
+		} else if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			ip = xri
+		}
+
+		// Log request for tracking
+		blocked := rw.statusCode == 429
+		requestID := handlers.LogRequest(ip, r.URL.Path, r.Method, r.UserAgent(), rw.statusCode, latencyMs, blocked)
 
 		m.logger.Printf(
-			"[%s] %s %s %d %d %s %s",
+			"[%s] %s %s %s %d %d %s %s",
+			requestID,
 			r.Method,
 			r.URL.Path,
-			r.RemoteAddr,
+			ip,
 			rw.statusCode,
 			rw.size,
 			duration,

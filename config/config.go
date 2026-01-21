@@ -25,7 +25,7 @@ func Load() *Config {
 		RedisAddr:       getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
 		RedisDB:         getEnvInt("REDIS_DB", 0),
-		PostgresDSN:     getEnv("POSTGRES_DSN", "postgres://postgres:password@localhost:5432/ratelimiter?sslmode=disable"),
+		PostgresDSN:     getEnv("POSTGRES_DSN", "postgresql://neondb_owner:npg_nEg8Tw3OGVtq@ep-dark-shape-ah06tcf0-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require"),
 		KafkaBrokers:    []string{getEnv("KAFKA_BROKERS", "localhost:9092")},
 		KafkaTopic:      getEnv("KAFKA_TOPIC", "abuse-events"),
 		JWTSecret:       getEnv("JWT_SECRET", "your-secret-key-change-in-production"),

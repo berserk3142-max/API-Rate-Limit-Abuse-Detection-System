@@ -23,10 +23,16 @@ type APIKey struct {
 }
 
 type IPReputation struct {
-	IP        string    `json:"ip"`
-	Score     float64   `json:"score"`
-	LastSeen  time.Time `json:"last_seen"`
-	IsBlocked bool      `json:"is_blocked"`
+	IP              string    `json:"ip"`
+	Score           float64   `json:"score"`
+	TotalRequests   int64     `json:"total_requests"`
+	SuccessRequests int64     `json:"success_requests"`
+	BlockedRequests int64     `json:"blocked_requests"`
+	IsBlocked       bool      `json:"is_blocked"`
+	IsSuspicious    bool      `json:"is_suspicious"`
+	Reason          string    `json:"reason,omitempty"`
+	FirstSeen       time.Time `json:"first_seen"`
+	LastSeen        time.Time `json:"last_seen"`
 }
 
 type AbuseEvent struct {

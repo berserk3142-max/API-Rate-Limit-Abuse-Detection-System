@@ -41,6 +41,12 @@ func main() {
 		apiKeyRepo = repository.NewAPIKeyRepository(db.Conn())
 		ipRepo = repository.NewIPReputationRepository(db.Conn())
 		abuseRepo = repository.NewAbuseEventRepository(db.Conn())
+		logRepo := repository.NewRequestLogRepository(db.Conn())
+
+		// Set database repositories for background sync
+		handlers.SetDBRepositories(ipRepo, logRepo)
+
+		logger.Printf("Connected to Neon PostgreSQL database successfully")
 		defer db.Close()
 	}
 
@@ -79,16 +85,27 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/dashboard", http.StatusTemporaryRedirect)
 			return
 		}
+		http.NotFound(w, r)
+	})
+
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "static/dashboard.html")
+	})
+
+	mux.HandleFunc("/api-info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Write([]byte(`{
 			"service": "API Rate-Limit & Abuse Detection Gateway",
 			"version": "1.0.0",
 			"status": "running",
 			"endpoints": {
+				"dashboard": "/dashboard",
 				"health": "/health",
 				"api": "/api/*",
 				"admin": {
@@ -126,6 +143,9 @@ func main() {
 	mux.HandleFunc("/admin/ip-risk", adminHandler.GetIPRiskScore)
 	mux.HandleFunc("/admin/abuse-events", adminHandler.GetAbuseEvents)
 	mux.HandleFunc("/admin/metrics", adminHandler.GetTrafficMetrics)
+	mux.HandleFunc("/admin/recent-requests", adminHandler.GetRecentRequestsHandler)
+	mux.HandleFunc("/admin/suspicious-ips", adminHandler.GetSuspiciousIPsHandler)
+	mux.HandleFunc("/admin/all-ips", adminHandler.GetAllIPsHandler)
 
 	if reverseProxy != nil {
 		mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -139,6 +159,7 @@ func main() {
 	}
 
 	var handler http.Handler = mux
+	handler = middleware.CORS(handler)
 	handler = rateLimitMiddleware.RateLimit(handler)
 	handler = fingerprintMiddleware.Fingerprint(handler)
 	handler = authMiddleware.OptionalAuth(handler)

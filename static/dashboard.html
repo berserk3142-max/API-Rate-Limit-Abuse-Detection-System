@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Rate Limiter Dashboard | Real-time Monitoring</title>
+    <meta name="description"
+        content="Real-time API Gateway monitoring dashboard with rate limiting, abuse detection, and traffic analytics">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #050508;
+            --bg-secondary: #0d0d12;
+            --bg-card: rgba(18, 18, 28, 0.7);
+            --bg-card-hover: rgba(25, 25, 40, 0.9);
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-tertiary: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.3);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.3);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 150%;
+            height: 150%;
+            top: -25%;
+            left: -25%;
+            background:
+                radial-gradient(ellipse 800px 600px at 20% 20%, rgba(99, 102, 241, 0.12), transparent 50%),
+                radial-gradient(ellipse 600px 400px at 80% 30%, rgba(139, 92, 246, 0.1), transparent 50%),
+                radial-gradient(ellipse 500px 500px at 40% 80%, rgba(168, 85, 247, 0.08), transparent 50%),
+                radial-gradient(ellipse 400px 300px at 90% 90%, rgba(236, 72, 153, 0.06), transparent 50%);
+            animation: bgFloat 20s ease-in-out infinite;
+        }
+
+        @keyframes bgFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            25% {
+                transform: translate(2%, 1%) rotate(1deg);
+            }
+
+            50% {
+                transform: translate(-1%, 2%) rotate(-1deg);
+            }
+
+            75% {
+                transform: translate(1%, -1%) rotate(0.5deg);
+            }
+        }
+
+        .grid-overlay {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem 3rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            padding: 1.5rem 2rem;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.5rem;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            box-shadow: 0 0 30px var(--accent-glow);
+            animation: logoGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes logoGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 30px var(--accent-glow);
+            }
+
+            50% {
+                box-shadow: 0 0 50px var(--accent-glow), 0 0 80px rgba(139, 92, 246, 0.2);
+            }
+        }
+
+        .logo-text h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, rgba(255, 255, 255, 0.8));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 100px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.offline {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .status-indicator.offline .status-dot {
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger);
+            animation: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.3);
+            }
+        }
+
+        .status-text {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--success);
+        }
+
+        .status-indicator.offline .status-text {
+            color: var(--danger);
+        }
+
+        .time-display {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Metrics Cards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.25rem;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--card-accent, var(--accent-primary)), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-hover);
+            box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.4);
+        }
+
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .metric-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: transform 0.3s ease;
+        }
+
+        .metric-card:hover .metric-icon {
+            transform: scale(1.1);
+        }
+
+        .metric-value {
+            font-size: 2.75rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-trend {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .trend-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .trend-badge.up {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .trend-badge.down {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+        }
+
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.25rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-title-icon {
+            font-size: 1.25rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Rate Limit Tester */
+        .rate-tester {
+            grid-column: span 2;
+        }
+
+        .rate-tester .card-body {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        .test-console {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .progress-container {
+            background: var(--bg-secondary);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .progress-label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .progress-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .progress-bar-container {
+            height: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 100px;
+            background: linear-gradient(90deg, var(--success), var(--accent-primary));
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+            position: relative;
+        }
+
+        .progress-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            from {
+                transform: translateX(-100%);
+            }
+
+            to {
+                transform: translateX(100%);
+            }
+        }
+
+        .progress-bar-fill.warning {
+            background: linear-gradient(90deg, var(--warning), var(--danger));
+        }
+
+        .progress-bar-fill.danger {
+            background: var(--danger);
+            box-shadow: 0 0 20px var(--danger-glow);
+        }
+
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .btn {
+            padding: 1rem 1.25rem;
+            border: none;
+            border-radius: 0.875rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px var(--accent-glow);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            box-shadow: 0 4px 20px var(--danger-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .btn-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-warning:hover {
+            background: rgba(245, 158, 11, 0.25);
+            box-shadow: 0 4px 20px var(--warning-glow);
+        }
+
+        .btn-burst {
+            grid-column: span 2;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            background: var(--bg-secondary);
+            border-radius: 1rem;
+            padding: 1.25rem;
+        }
+
+        .stats-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.875rem 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .stat-label-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            height: 200px;
+            margin-top: 1rem;
+        }
+
+        /* Request Log */
+        .log-container {
+            max-height: 350px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) transparent;
+        }
+
+        .log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 3px;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-entry:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .log-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            min-width: 70px;
+        }
+
+        .log-status {
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            min-width: 44px;
+            text-align: center;
+        }
+
+        .log-status.success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .log-status.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .log-message {
+            flex: 1;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .log-latency {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-id {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.7rem;
+            color: var(--accent-primary);
+            background: rgba(99, 102, 241, 0.15);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .log-method {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--success);
+            min-width: 35px;
+        }
+
+        .log-ip {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        .log-blocked-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.2);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            animation: blink 1s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .empty-state-text {
+            font-size: 0.9rem;
+        }
+
+        /* Endpoints Grid */
+        .endpoints-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .endpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .endpoint-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+
+        .endpoint-method {
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.7rem;
+            min-width: 44px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .endpoint-method.get {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .endpoint-method.post {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent-primary);
+        }
+
+        .endpoint-path {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Blocked IPs Section */
+        .blocked-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .blocked-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--danger);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .blocked-ip-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .blocked-ip-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .blocked-ip-address {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .blocked-ip-score {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .btn-unblock {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+            background: transparent;
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-unblock:hover {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        /* IP Management Section */
+        .ip-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .ip-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .ip-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .ip-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Toast Notification */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: toastIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 300px;
+        }
+
+        .toast.removing {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+        }
+
+        .toast.success {
+            border-color: var(--success);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+        }
+
+        .toast.warning {
+            border-color: var(--warning);
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.125rem;
+        }
+
+        .toast-message {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1400px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .rate-tester .card-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-burst {
+                grid-column: auto;
+            }
+        }
+
+        /* Plan Badge */
+        .plan-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .plan-badge.free {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-primary);
+        }
+
+        .plan-badge.pro {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.2));
+            color: var(--accent-secondary);
+        }
+
+        .plan-badge.enterprise {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(245, 158, 11, 0.2));
+            color: var(--accent-pink);
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-animation"></div>
+    <div class="grid-overlay"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <div class="logo-icon">🛡️</div>
+                <div class="logo-text">
+                    <h1>API Rate Limiter</h1>
+                    <span>Real-time Monitoring Dashboard</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="time-display" id="currentTime">--:--:--</span>
+                <div class="status-indicator" id="serverStatus">
+                    <div class="status-dot"></div>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Metrics Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card" style="--card-accent: var(--accent-primary);">
+                <div class="metric-header">
+                    <span class="metric-label">Total Requests</span>
+                    <div class="metric-icon" style="background: rgba(99, 102, 241, 0.15);">📊</div>
+                </div>
+                <div class="metric-value" id="totalRequests">0</div>
+                <div class="metric-trend">
+                    <span class="trend-badge up" id="requestsTrend">↑ 0/min</span>
+                    <span style="color: var(--text-muted);">This session</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: var(--success);">
+                <div class="metric-header">
+                    <span class="metric-label">Remaining Quota</span>
+                    <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15);">⚡</div>
+                </div>
+                <div class="metric-value" id="remainingQuota" style="color: var(--success);">100</div>
+                <div class="metric-trend">
+                    <span class="plan-badge free">FREE Plan</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: var(--danger);">
+                <div class="metric-header">
+                    <span class="metric-label">Blocked IPs</span>
+                    <div class="metric-icon" style="background: rgba(239, 68, 68, 0.15);">🚫</div>
+                </div>
+                <div class="metric-value" id="blockedCount" style="color: var(--danger);">0</div>
+                <div class="metric-trend">
+                    <span style="color: var(--text-muted);">Currently blocked</span>
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: var(--warning);">
+                <div class="metric-header">
+                    <span class="metric-label">Avg Latency</span>
+                    <div class="metric-icon" style="background: rgba(245, 158, 11, 0.15);">⏱️</div>
+                </div>
+                <div class="metric-value" id="avgLatency">0<span
+                        style="font-size: 1rem; color: var(--text-secondary);">ms</span></div>
+                <div class="metric-trend">
+                    <span style="color: var(--text-muted);">Response time</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limit Tester -->
+        <div class="card rate-tester">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="card-title-icon">🎯</span>
+                    Rate Limit Tester
+                </h2>
+                <span class="plan-badge free">100 req/min</span>
+            </div>
+            <div class="card-body">
+                <div class="test-console">
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Test the rate limiting in real-time. Send requests and watch the quota decrease.
+                        When you hit the limit, you'll see a <span style="color: var(--danger);">429 Too Many
+                            Requests</span> response!
+                    </p>
+
+                    <div class="progress-container">
+                        <div class="progress-header">
+                            <span class="progress-label">Rate Limit Usage</span>
+                            <span class="progress-value" id="usagePercent">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-stats">
+                            <span id="usedCount">0 used</span>
+                            <span id="windowReset">Resets in 60s</span>
+                        </div>
+                    </div>
+
+                    <div class="button-grid">
+                        <button class="btn btn-primary" onclick="sendSingleRequest()" id="btnSingle">
+                            🚀 Send 1 Request
+                        </button>
+                        <button class="btn btn-primary" onclick="sendBurstRequests(10)" id="btn10">
+                            ⚡ Send 10 Requests
+                        </button>
+                        <button class="btn btn-danger btn-burst" onclick="sendBurstRequests(50)" id="btn50">
+                            💥 Send 50 Requests (Trigger Limit!)
+                        </button>
+                        <button class="btn btn-secondary" onclick="resetStats()">
+                            🔄 Reset Stats
+                        </button>
+                        <button class="btn btn-warning" onclick="fetchMetrics()">
+                            📈 Refresh Metrics
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-panel">
+                    <div class="stats-title">Session Statistics</div>
+                    <div class="stat-row">
+                        <span class="stat-label">
+                            <span class="stat-label-dot" style="background: var(--success);"></span>
+                            Successful
+                        </span>
+                        <span class="stat-value" id="successCount" style="color: var(--success);">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">
+                            <span class="stat-label-dot" style="background: var(--danger);"></span>
+                            Blocked (429)
+                        </span>
+                        <span class="stat-value" id="blockedRequestCount" style="color: var(--danger);">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">
+                            <span class="stat-label-dot" style="background: var(--warning);"></span>
+                            Errors
+                        </span>
+                        <span class="stat-value" id="errorCount" style="color: var(--warning);">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">
+                            <span class="stat-label-dot" style="background: var(--accent-primary);"></span>
+                            Success Rate
+                        </span>
+                        <span class="stat-value" id="successRate" style="color: var(--accent-primary);">--%</span>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <!-- Request Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-title-icon">📜</span>
+                        Request Log
+                    </h2>
+                    <button class="btn btn-secondary" onclick="clearLogs()"
+                        style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                        Clear
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="log-container" id="logsContainer">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <div class="empty-state-text">No requests yet. Click a button above to start testing!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoints & IP Management -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="card-title-icon">🔗</span>
+                        API Endpoints
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="endpoints-grid">
+                        <div class="endpoint-item" onclick="testEndpoint('/health', 'GET')">
+                            <span class="endpoint-method get">GET</span>
+                            <span class="endpoint-path">/health</span>
+                        </div>
+                        <div class="endpoint-item" onclick="testEndpoint('/admin/metrics', 'GET')">
+                            <span class="endpoint-method get">GET</span>
+                            <span class="endpoint-path">/admin/metrics</span>
+                        </div>
+                        <div class="endpoint-item" onclick="testEndpoint('/admin/blocked-ips', 'GET')">
+                            <span class="endpoint-method get">GET</span>
+                            <span class="endpoint-path">/admin/blocked-ips</span>
+                        </div>
+                        <div class="endpoint-item" onclick="testEndpoint('/api/test', 'GET')">
+                            <span class="endpoint-method get">GET</span>
+                            <span class="endpoint-path">/api/test</span>
+                        </div>
+                        <div class="endpoint-item" onclick="testEndpoint('/api-info', 'GET')">
+                            <span class="endpoint-method get">GET</span>
+                            <span class="endpoint-path">/api-info</span>
+                        </div>
+                    </div>
+
+                    <div class="blocked-section">
+                        <div class="blocked-title">
+                            <span>🚫</span>
+                            IP Management
+                        </div>
+
+                        <div class="ip-input-group">
+                            <input type="text" class="ip-input" id="ipInput"
+                                placeholder="Enter IP address (e.g., 192.168.1.1)">
+                            <button class="btn btn-danger" onclick="blockIP()" style="padding: 0.75rem 1rem;">
+                                Block
+                            </button>
+                        </div>
+
+                        <div id="blockedIpsList">
+                            <div class="empty-state" style="padding: 1.5rem;">
+                                <div class="empty-state-text">No blocked IPs</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+
+        // State
+        let state = {
+            totalRequests: 0,
+            successCount: 0,
+            blockedRequestCount: 0,
+            errorCount: 0,
+            remainingQuota: 100,
+            latencies: [],
+            latencyHistory: [],
+            startTime: Date.now(),
+            isOnline: false
+        };
+
+        // Chart
+        let latencyChart;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            updateTime();
+            setInterval(updateTime, 1000);
+            checkServerStatus();
+            setInterval(checkServerStatus, 5000);
+            fetchMetrics();
+            setInterval(fetchMetrics, 3000);
+            fetchBlockedIPs();
+            setInterval(fetchBlockedIPs, 10000);
+            fetchRecentRequests();
+            setInterval(fetchRecentRequests, 2000);
+        });
+
+        function initChart() {
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+            latencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Latency (ms)',
+                        data: [],
+                        borderColor: 'rgb(99, 102, 241)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointBackgroundColor: 'rgb(99, 102, 241)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.5)',
+                                font: { size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(latency) {
+            state.latencyHistory.push(latency);
+            if (state.latencyHistory.length > 20) {
+                state.latencyHistory.shift();
+            }
+
+            latencyChart.data.labels = state.latencyHistory.map((_, i) => i + 1);
+            latencyChart.data.datasets[0].data = state.latencyHistory;
+            latencyChart.update('none');
+        }
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+        }
+
+        async function checkServerStatus() {
+            const statusEl = document.getElementById('serverStatus');
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    state.isOnline = true;
+                    statusEl.classList.remove('offline');
+                    statusEl.querySelector('.status-text').textContent = 'Online';
+                    return true;
+                }
+            } catch (e) { }
+            state.isOnline = false;
+            statusEl.classList.add('offline');
+            statusEl.querySelector('.status-text').textContent = 'Offline';
+            return false;
+        }
+
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/metrics`);
+                const data = await response.json();
+
+                // Update server-side stats
+                document.getElementById('blockedCount').textContent = data.total_blocked_ips || 0;
+                if (data.total_requests > 0) {
+                    document.getElementById('totalRequests').textContent = data.total_requests;
+                    state.totalRequests = data.total_requests;
+                }
+                if (data.success_requests > 0) {
+                    document.getElementById('successCount').textContent = data.success_requests;
+                    state.successCount = data.success_requests;
+                }
+                if (data.blocked_requests > 0) {
+                    document.getElementById('blockedRequestCount').textContent = data.blocked_requests;
+                    state.blockedRequestCount = data.blocked_requests;
+                }
+                if (data.avg_latency_ms > 0) {
+                    document.getElementById('avgLatency').innerHTML = `${data.avg_latency_ms}<span style="font-size: 1rem; color: var(--text-secondary);">ms</span>`;
+                }
+
+                const remaining = response.headers.get('X-RateLimit-Remaining');
+                if (remaining) {
+                    state.remainingQuota = parseInt(remaining);
+                    updateQuotaDisplay();
+                }
+
+                updateStats();
+            } catch (e) {
+                console.error('Failed to fetch metrics:', e);
+            }
+        }
+
+        async function fetchRecentRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/recent-requests`);
+                const data = await response.json();
+
+                if (data.requests && data.requests.length > 0) {
+                    const container = document.getElementById('logsContainer');
+                    const emptyState = container.querySelector('.empty-state');
+                    if (emptyState) {
+                        container.innerHTML = '';
+                    }
+
+                    // Only show new requests
+                    const existingIds = new Set(
+                        Array.from(container.querySelectorAll('.log-entry'))
+                            .map(el => el.dataset.requestId)
+                    );
+
+                    const newRequests = data.requests.filter(r => !existingIds.has(r.id));
+
+                    newRequests.forEach(req => {
+                        const time = new Date(req.timestamp).toLocaleTimeString();
+                        const statusClass = req.status === 200 ? 'success' : 'error';
+                        const blockedBadge = req.blocked ? '<span class="log-blocked-badge">BLOCKED</span>' : '';
+
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        logEntry.dataset.requestId = req.id;
+                        logEntry.innerHTML = `
+                            <span class="log-id">${req.id}</span>
+                            <span class="log-time">${time}</span>
+                            <span class="log-status ${statusClass}">${req.status}</span>
+                            <span class="log-method">${req.method}</span>
+                            <span class="log-message">${req.path}</span>
+                            <span class="log-ip">${req.ip}</span>
+                            ${blockedBadge}
+                            <span class="log-latency">${req.latency_ms}ms</span>
+                        `;
+
+                        container.insertBefore(logEntry, container.firstChild);
+
+                        // Update chart with new latency
+                        if (req.latency_ms > 0) {
+                            updateChart(req.latency_ms);
+                        }
+                    });
+
+                    // Keep only last 50 entries
+                    while (container.children.length > 50) {
+                        container.removeChild(container.lastChild);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch recent requests:', e);
+            }
+        }
+
+        async function fetchBlockedIPs() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/blocked-ips`);
+                const data = await response.json();
+                const container = document.getElementById('blockedIpsList');
+
+                if (data.blocked_ips && data.blocked_ips.length > 0) {
+                    container.innerHTML = data.blocked_ips.map(ip => `
+                        <div class="blocked-ip-item">
+                            <div class="blocked-ip-info">
+                                <span class="blocked-ip-address">${ip.ip}</span>
+                                <span class="blocked-ip-score">Risk Score: ${ip.score?.toFixed(2) || 'N/A'}</span>
+                            </div>
+                            <button class="btn-unblock" onclick="unblockIP('${ip.ip}')">Unblock</button>
+                        </div>
+                    `).join('');
+                    document.getElementById('blockedCount').textContent = data.blocked_ips.length;
+                } else {
+                    container.innerHTML = '<div class="empty-state" style="padding: 1.5rem;"><div class="empty-state-text">No blocked IPs</div></div>';
+                }
+            } catch (e) {
+                console.error('Failed to fetch blocked IPs:', e);
+            }
+        }
+
+        function updateQuotaDisplay() {
+            const quota = Math.max(0, state.remainingQuota);
+            const used = 100 - quota;
+            const percent = (used / 100) * 100;
+
+            document.getElementById('remainingQuota').textContent = quota;
+            document.getElementById('usagePercent').textContent = `${percent.toFixed(0)}%`;
+            document.getElementById('usedCount').textContent = `${used} used`;
+
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = `${percent}%`;
+
+            if (percent >= 90) {
+                progressFill.className = 'progress-bar-fill danger';
+                document.getElementById('remainingQuota').style.color = 'var(--danger)';
+            } else if (percent >= 70) {
+                progressFill.className = 'progress-bar-fill warning';
+                document.getElementById('remainingQuota').style.color = 'var(--warning)';
+            } else {
+                progressFill.className = 'progress-bar-fill';
+                document.getElementById('remainingQuota').style.color = 'var(--success)';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalRequests').textContent = state.totalRequests;
+            document.getElementById('successCount').textContent = state.successCount;
+            document.getElementById('blockedRequestCount').textContent = state.blockedRequestCount;
+            document.getElementById('errorCount').textContent = state.errorCount;
+
+            if (state.latencies.length > 0) {
+                const avg = state.latencies.reduce((a, b) => a + b, 0) / state.latencies.length;
+                document.getElementById('avgLatency').innerHTML = `${avg.toFixed(0)}<span style="font-size: 1rem; color: var(--text-secondary);">ms</span>`;
+            }
+
+            const successRate = state.totalRequests > 0
+                ? ((state.successCount / state.totalRequests) * 100).toFixed(1)
+                : '--';
+            document.getElementById('successRate').textContent = `${successRate}%`;
+
+            // Update requests per minute trend
+            const elapsed = (Date.now() - state.startTime) / 60000;
+            const rpm = elapsed > 0 ? (state.totalRequests / elapsed).toFixed(1) : 0;
+            document.getElementById('requestsTrend').innerHTML = `↑ ${rpm}/min`;
+        }
+
+        function addLog(status, message, latency, requestId = null) {
+            const container = document.getElementById('logsContainer');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                container.innerHTML = '';
+            }
+
+            const time = new Date().toLocaleTimeString();
+            const statusClass = status === 200 ? 'success' : 'error';
+            const statusCode = status === 200 ? '200' : status === 429 ? '429' : status.toString();
+            const idDisplay = requestId ? `<span class="log-id">${requestId}</span>` : '';
+            const blockedBadge = status === 429 ? '<span class="log-blocked-badge">BLOCKED</span>' : '';
+
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            if (requestId) logEntry.dataset.requestId = requestId;
+            logEntry.innerHTML = `
+                ${idDisplay}
+                <span class="log-time">${time}</span>
+                <span class="log-status ${statusClass}">${statusCode}</span>
+                <span class="log-message">${message}</span>
+                ${blockedBadge}
+                <span class="log-latency">${latency}ms</span>
+            `;
+
+            container.insertBefore(logEntry, container.firstChild);
+
+            // Keep only last 50 entries
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearLogs() {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <div class="empty-state-text">No requests yet. Click a button above to start testing!</div>
+                </div>
+            `;
+        }
+
+        async function sendRequest() {
+            const start = Date.now();
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const latency = Date.now() - start;
+                state.latencies.push(latency);
+                state.totalRequests++;
+
+                const remaining = response.headers.get('X-RateLimit-Remaining');
+                if (remaining) {
+                    state.remainingQuota = parseInt(remaining);
+                }
+
+                if (response.status === 200) {
+                    state.successCount++;
+                    addLog(200, 'Request successful - Health check OK', latency);
+                } else if (response.status === 429) {
+                    state.blockedRequestCount++;
+                    state.remainingQuota = 0;
+                    addLog(429, 'RATE LIMITED! Too many requests', latency);
+                    showToast('Rate limit exceeded!', 'Wait 60 seconds for the window to reset.', 'error');
+                }
+
+                updateQuotaDisplay();
+                updateStats();
+                updateChart(latency);
+                return response.status;
+            } catch (e) {
+                const latency = Date.now() - start;
+                state.totalRequests++;
+                state.errorCount++;
+                addLog(500, 'Request failed: ' + e.message, latency);
+                updateStats();
+                return 500;
+            }
+        }
+
+        async function sendSingleRequest() {
+            const btn = document.getElementById('btnSingle');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loading-spinner"></div> Sending...';
+
+            await sendRequest();
+
+            btn.disabled = false;
+            btn.innerHTML = '🚀 Send 1 Request';
+        }
+
+        async function sendBurstRequests(count) {
+            const btnId = count === 10 ? 'btn10' : 'btn50';
+            const btn = document.getElementById(btnId);
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+
+            for (let i = 0; i < count; i++) {
+                btn.innerHTML = `<div class="loading-spinner"></div> ${i + 1}/${count}`;
+                await sendRequest();
+                await new Promise(r => setTimeout(r, 30));
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            showToast('Burst Complete', `Sent ${count} requests`, 'success');
+        }
+
+        async function testEndpoint(path, method = 'GET') {
+            const start = Date.now();
+            try {
+                const response = await fetch(`${API_BASE}${path}`, { method });
+                const latency = Date.now() - start;
+                state.latencies.push(latency);
+                state.totalRequests++;
+
+                const remaining = response.headers.get('X-RateLimit-Remaining');
+                if (remaining) {
+                    state.remainingQuota = parseInt(remaining);
+                }
+
+                if (response.ok) {
+                    state.successCount++;
+                    const data = await response.json();
+                    addLog(200, `${method} ${path}`, latency);
+                    showToast('Endpoint Response', JSON.stringify(data).substring(0, 100) + '...', 'success');
+                } else if (response.status === 429) {
+                    state.blockedRequestCount++;
+                    addLog(429, `${method} ${path} - BLOCKED`, latency);
+                    showToast('Rate Limited', 'Too many requests', 'error');
+                } else {
+                    state.errorCount++;
+                    addLog(response.status, `${method} ${path} - Error`, latency);
+                }
+
+                updateQuotaDisplay();
+                updateStats();
+                updateChart(latency);
+            } catch (e) {
+                const latency = Date.now() - start;
+                state.totalRequests++;
+                state.errorCount++;
+                addLog(500, `${method} ${path} - ${e.message}`, latency);
+                updateStats();
+            }
+        }
+
+        async function blockIP() {
+            const input = document.getElementById('ipInput');
+            const ip = input.value.trim();
+
+            if (!ip) {
+                showToast('Error', 'Please enter a valid IP address', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/blocked-ips`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip })
+                });
+
+                if (response.ok) {
+                    showToast('IP Blocked', `${ip} has been blocked`, 'success');
+                    input.value = '';
+                    fetchBlockedIPs();
+                } else {
+                    const data = await response.json();
+                    showToast('Error', data.error || 'Failed to block IP', 'error');
+                }
+            } catch (e) {
+                showToast('Error', e.message, 'error');
+            }
+        }
+
+        async function unblockIP(ip) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/unblock`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip })
+                });
+
+                if (response.ok) {
+                    showToast('IP Unblocked', `${ip} has been unblocked`, 'success');
+                    fetchBlockedIPs();
+                } else {
+                    const data = await response.json();
+                    showToast('Error', data.error || 'Failed to unblock IP', 'error');
+                }
+            } catch (e) {
+                showToast('Error', e.message, 'error');
+            }
+        }
+
+        function resetStats() {
+            state.totalRequests = 0;
+            state.successCount = 0;
+            state.blockedRequestCount = 0;
+            state.errorCount = 0;
+            state.latencies = [];
+            state.latencyHistory = [];
+            state.startTime = Date.now();
+
+            latencyChart.data.labels = [];
+            latencyChart.data.datasets[0].data = [];
+            latencyChart.update();
+
+            updateStats();
+            clearLogs();
+            showToast('Stats Reset', 'All statistics have been cleared', 'success');
+        }
+
+        function showToast(title, message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type]}</span>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Handle Enter key on IP input
+        document.getElementById('ipInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                blockIP();
+            }
+        });
+    </script>
+</body>
+
+</html>

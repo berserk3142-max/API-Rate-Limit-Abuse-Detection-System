@@ -1,0 +1,66 @@
+# =============================================================================
+# Docker Ignore File
+# =============================================================================
+# This file specifies which files/directories should be excluded from Docker
+# build context to speed up builds and reduce image size.
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# IDE and Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Test files
+*_test.go
+**/*_test.go
+coverage.out
+*.test
+
+# Local configuration
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Debug
+*.log
+*.tmp
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Temporary files
+tmp/
+temp/

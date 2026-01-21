@@ -345,6 +345,83 @@ http://localhost:8080/dashboard
 
 ---
 
+## 🐳 Docker Deployment
+
+### Quick Docker Start
+
+```bash
+# Clone the repository
+git clone https://github.com/berserk3142-max/API-Rate-Limit-Abuse-Detection-System.git
+cd API-Rate-Limit-Abuse-Detection-System
+
+# Start all services with Docker Compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f api-gateway
+```
+
+### Docker Architecture
+
+```mermaid
+flowchart TB
+    subgraph Docker Network
+        A[API Gateway<br/>:8080] --> B[(Redis<br/>:6379)]
+        A --> C[(PostgreSQL<br/>:5432)]
+        A --> D[Kafka<br/>:9092]
+        D --> E[Zookeeper<br/>:2181]
+    end
+    
+    F[Client] --> A
+    
+    style A fill:#fff3e0
+    style B fill:#ffcdd2
+    style C fill:#c8e6c9
+    style D fill:#e1bee7
+```
+
+### Services Included
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **api-gateway** | 8080 | Main application |
+| **redis** | 6379 | Rate limiting cache |
+| **postgres** | 5432 | Persistent storage |
+| **kafka** | 9092 | Event streaming |
+| **zookeeper** | 2181 | Kafka coordination |
+
+### Build Only the API Gateway
+
+```bash
+# Build the Docker image
+docker build -t api-gateway .
+
+# Run with environment variables
+docker run -d \
+  --name api-gateway \
+  -p 8080:8080 \
+  -e REDIS_ADDR=your-redis-host:6379 \
+  -e POSTGRES_DSN=your-postgres-dsn \
+  api-gateway
+```
+
+### Production Configuration
+
+Create a `.env` file from the template:
+
+```bash
+cp .env.example .env
+# Edit .env with your production values
+```
+
+Key production considerations:
+- Use external managed Redis (e.g., Redis Cloud, AWS ElastiCache)
+- Use Neon or managed PostgreSQL
+- Set strong `JWT_SECRET`
+- Configure proper `BACKEND_URL`
+
+---
+
 ## 📡 API Reference
 
 ### Endpoint Overview

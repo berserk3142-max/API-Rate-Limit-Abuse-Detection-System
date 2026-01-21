@@ -169,9 +169,39 @@ func (h *AdminHandler) GetTrafficMetrics(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AdminHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var totalIPs, blockedIPs int
+	if h.ipRepo != nil {
+		totalIPs, blockedIPs, _ = h.ipRepo.GetStats(ctx)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "healthy",
-		"service": "api-gateway",
+		"status":           "healthy",
+		"service":          "api-gateway",
+		"total_requests":   totalIPs,
+		"blocked_requests": blockedIPs,
+	})
+}
+
+func (h *AdminHandler) GetAllIPs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if h.ipRepo == nil {
+		http.Error(w, `{"error": "database not connected"}`, http.StatusInternalServerError)
+		return
+	}
+
+	ips, err := h.ipRepo.GetAllIPs(ctx)
+	if err != nil {
+		http.Error(w, `{"error": "failed to get ips"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ips":   ips,
+		"count": len(ips),
 	})
 }

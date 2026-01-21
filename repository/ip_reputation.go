@@ -91,6 +91,34 @@ func (r *IPReputationRepository) GetBlockedIPs(ctx context.Context) ([]*models.I
 	return ips, nil
 }
 
+func (r *IPReputationRepository) GetAllIPs(ctx context.Context) ([]*models.IPReputation, error) {
+	query := `SELECT ip, score, last_seen, is_blocked FROM ip_reputation ORDER BY last_seen DESC LIMIT 100`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ips []*models.IPReputation
+	for rows.Next() {
+		rep := &models.IPReputation{}
+		if err := rows.Scan(&rep.IP, &rep.Score, &rep.LastSeen, &rep.IsBlocked); err != nil {
+			return nil, err
+		}
+		ips = append(ips, rep)
+	}
+	return ips, nil
+}
+
+func (r *IPReputationRepository) GetStats(ctx context.Context) (totalIPs int, blockedIPs int, err error) {
+	query := `SELECT 
+		COUNT(*) as total,
+		COUNT(CASE WHEN is_blocked = true THEN 1 END) as blocked
+	FROM ip_reputation`
+	err = r.db.QueryRowContext(ctx, query).Scan(&totalIPs, &blockedIPs)
+	return
+}
+
 type AbuseEventRepository struct {
 	db *sql.DB
 }

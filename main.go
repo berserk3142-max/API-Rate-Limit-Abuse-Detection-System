@@ -104,6 +104,15 @@ func main() {
 
 	mux.HandleFunc("/health", adminHandler.HealthCheck)
 
+	// Serve dashboard
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/dashboard.html")
+	})
+
+	// Serve static files
+	fs := http.FileServer(http.Dir("static"))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+
 	mux.HandleFunc("/admin/blocked-ips", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -126,6 +135,7 @@ func main() {
 	mux.HandleFunc("/admin/ip-risk", adminHandler.GetIPRiskScore)
 	mux.HandleFunc("/admin/abuse-events", adminHandler.GetAbuseEvents)
 	mux.HandleFunc("/admin/metrics", adminHandler.GetTrafficMetrics)
+	mux.HandleFunc("/admin/all-ips", adminHandler.GetAllIPs)
 
 	if reverseProxy != nil {
 		mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
